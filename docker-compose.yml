@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ortodoncia-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ortodoncia
+      POSTGRES_PASSWORD: ortodoncia
+      POSTGRES_DB: ortodoncia
+    ports:
+      - "5432:5432"
+    volumes:
+      - ortodoncia_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ortodoncia -d ortodoncia"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ortodoncia_pgdata:

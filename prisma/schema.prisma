@@ -1,0 +1,126 @@
+// Esquema de datos del sistema de agendamiento de ortodoncia.
+// Ejecutar `npm run db:push` para aplicar los cambios a MySQL.
+// El esquema no usa columnas tipadas `decimal`, así que no se requiere @db.Decimal.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  ODONTOLOGO
+  ASISTENTE
+}
+
+enum AppointmentType {
+  VALORACION
+  INSTALACION
+  CONTROL
+  AJUSTE
+  URGENCIA
+  RETIRO
+}
+
+enum AppointmentStatus {
+  PROGRAMADA
+  CONFIRMADA
+  ATENDIDA
+  CANCELADA
+  NO_ASISTIO
+}
+
+enum TreatmentType {
+  BRACKETS_METALICOS
+  BRACKETS_ESTETICOS
+  ALINEADORES
+  RETENEDOR
+  OTRO
+}
+
+enum TreatmentStatus {
+  ACTIVO
+  FINALIZADO
+  SUSPENDIDO
+}
+
+/// Personal de la clínica que inicia sesión y atiende citas.
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  passwordHash String
+  role         Role          @default(ASISTENTE)
+  /// Color usado para identificar al profesional en la agenda (hex).
+  color        String        @default("#0f766e")
+  active       Boolean       @default(true)
+  appointments Appointment[] @relation("AppointmentOrthodontist")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+/// Paciente de la clínica.
+model Patient {
+  id            String        @id @default(cuid())
+  fullName      String
+  documentId    String?       @unique
+  birthDate     DateTime?
+  phone         String?
+  email         String?
+  address       String?
+  /// Datos del acudiente (pacientes menores de edad).
+  guardianName  String?
+  guardianPhone String?
+  notes         String?
+  active        Boolean       @default(true)
+  treatments    Treatment[]
+  appointments  Appointment[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([fullName])
+}
+
+/// Tratamiento ortodóntico contratado por un paciente.
+model Treatment {
+  id             String          @id @default(cuid())
+  patientId      String
+  patient        Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  type           TreatmentType
+  status         TreatmentStatus @default(ACTIVO)
+  startedAt      DateTime        @default(now())
+  estimatedEndAt DateTime?
+  finishedAt     DateTime?
+  /// Valor total en pesos colombianos.
+  totalPrice     Decimal?        @db.Decimal(12, 2)
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([patientId])
+  @@index([status])
+}
+
+/// Cita agendada con un profesional.
+model Appointment {
+  id             String            @id @default(cuid())
+  patientId      String
+  patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  orthodontistId String
+  orthodontist   User              @relation("AppointmentOrthodontist", fields: [orthodontistId], references: [id])
+  type           AppointmentType   @default(CONTROL)
+  status         AppointmentStatus @default(PROGRAMADA)
+  startsAt       DateTime
+  durationMin    Int               @default(40)
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([startsAt])
+  @@index([orthodontistId, startsAt])
+  @@index([patientId, startsAt])
+}
